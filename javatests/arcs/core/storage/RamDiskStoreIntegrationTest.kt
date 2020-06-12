@@ -61,7 +61,7 @@ class RamDiskStoreIntegrationTest {
     fun stores_sequenceOfModelAndOperationUpdates_asModels() = runBlockingTest {
         val storageKey = RamDiskStorageKey("unique")
         val store = createStore(storageKey)
-        val activeStore = store.activate()
+        val activeStore = store.activate() as DirectStore<CrdtCount.Data, CrdtCount.Operation, Int>
 
         val count = CrdtCount()
         count.applyOperation(MultiIncrement(actor = "me", version = 0 to 27, delta = 42))
@@ -100,9 +100,9 @@ class RamDiskStoreIntegrationTest {
     fun stores_operationUpdates_fromMultipleSources() = runBlockingTest {
         val storageKey = RamDiskStorageKey("unique")
         val store1 = createStore(storageKey)
-        val activeStore1 = store1.activate()
+        val activeStore1 = store1.activate() as DirectStore<CrdtCount.Data, CrdtCount.Operation, Int>
         val store2 = createStore(storageKey)
-        val activeStore2 = store2.activate()
+        val activeStore2 = store2.activate() as DirectStore<CrdtCount.Data, CrdtCount.Operation, Int>
 
         val count1 = CrdtCount()
         count1.applyOperation(MultiIncrement("me", version = 0 to 27, delta = 42))

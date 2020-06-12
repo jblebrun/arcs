@@ -89,7 +89,7 @@ class ReferenceTest {
                 type = CollectionType(ReferenceType(EntityType(Person.SCHEMA))),
                 mode = StorageMode.Direct
             )
-        val directCollection = Store(collectionOptions).activate()
+        val directCollection = Store(collectionOptions).activate() as DirectStore<CrdtSet.Data<Reference>, CrdtSet.Operation<Reference>, Set<Reference>>
         val job = Job()
         val me = directCollection.on(ProxyCallback {
             if (it is ProxyMessage.ModelUpdate<*, *, *>) job.complete()

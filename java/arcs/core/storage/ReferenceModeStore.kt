@@ -165,21 +165,6 @@ class ReferenceModeStore private constructor(
         containerStore.idle()
     }
 
-    override suspend fun getLocalData(): RefModeStoreData {
-        val containerData = containerStore.getLocalData()
-        val (pendingIds, modelGetter) = constructPendingIdsAndModel(containerData)
-
-        if (pendingIds.isEmpty()) {
-            return modelGetter() as RefModeStoreData
-        }
-
-        val deferred = CompletableDeferred<RefModeStoreData>(coroutineContext[Job.Key])
-        sendQueue.enqueueBlocking(pendingIds) {
-            deferred.complete(modelGetter() as RefModeStoreData)
-        }
-        return deferred.await()
-    }
-
     override fun on(
         callback: ProxyCallback<RefModeStoreData, RefModeStoreOp, RefModeStoreOutput>
     ): Int = callbacks.register(callback)

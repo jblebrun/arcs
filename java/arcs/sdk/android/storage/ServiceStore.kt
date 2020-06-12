@@ -137,21 +137,6 @@ class ServiceStore<Data : CrdtData, Op : CrdtOperation, ConsumerData>(
         log.debug { "ServiceStore is idle" }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override suspend fun getLocalData(): Data {
-        val service = checkNotNull(storageService)
-        return DeferredProxyCallback().let {
-            outgoingMessages.incrementAndGet()
-            service.getLocalData(it)
-            val message = it.await()
-            outgoingMessages.decrementAndGet()
-            val modelUpdate = message.decodeProxyMessage()
-                as? ProxyMessage.ModelUpdate<Data, Op, ConsumerData>
-            if (modelUpdate == null) throw CrdtException("Wrong message type received $modelUpdate")
-            modelUpdate.model
-        }
-    }
-
     override fun on(callback: ProxyCallback<Data, Op, ConsumerData>): Int {
         val service = checkNotNull(storageService)
         return service.registerCallback(object : IStorageServiceCallback.Stub() {
