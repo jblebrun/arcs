@@ -23,18 +23,21 @@ particle Reader0 in 'arcs.showcase.references.Reader0'
   level0: reads [Level0]
 
 particle Writer1 in 'arcs.showcase.references.Writer1'
-  level0: reads writes Level0
+  level0: reads writes [Level0]
   level1: writes [Level1]
 
 particle Reader1 in 'arcs.showcase.references.Reader1'
+  level0: reads writes [Level0]
   level1: reads [Level1]
 
 particle Writer2 in 'arcs.showcase.references.Writer2'
-  level0: reads writes Level0
-  level1: reads writes Level1
+  level0: reads writes [Level0]
+  level1: reads writes [Level1]
   level2: writes [Level2]
 
 particle Reader2 in 'arcs.showcase.references.Reader2'
+  level0: reads writes [Level0]
+  level1: reads writes [Level1]
   level2: reads [Level2]
 
 @arcId('testArc')
@@ -57,6 +60,7 @@ recipe WriteRecipe
     level1: level1
 
   Reader1
+    level0: level0s
     level1: level1
 
   Writer2
@@ -65,4 +69,6 @@ recipe WriteRecipe
     level2: level2
 
   Reader2
+    level0: level0s
+    level1: level1s
     level2: level2

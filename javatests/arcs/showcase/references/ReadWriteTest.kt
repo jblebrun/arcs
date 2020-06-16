@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ReadWriteTest {
 
-    private lateinit var arcs: Arcs
+    private lateinit var arcsStorage: ArcsStorage
 
     @Before
     fun setUp() {
@@ -26,39 +26,37 @@ class ReadWriteTest {
         DriverAndKeyConfigurator.configure(AndroidSqliteDatabaseManager(app))
 
         WorkManagerTestInitHelper.initializeTestWorkManager(app)
-        arcs = Arcs(
+        val arcs = Arcs(
             app,
             TestConnectionFactory(app)
         )
+        arcsStorage = ArcsStorage(arcs)
     }
 
     @After
     fun tearDown() {
-        runBlocking { arcs.stop() }
+        runBlocking { arcsStorage.stop() }
     }
 
     private val l0 = MyLevel0("l0-1")
     private val l1 = MyLevel1("l1-1", setOf(l0))
     private val l2 = MyLevel2("l2-1", setOf(l1))
 
-    @Ignore("b/156993103 - Deflake")
     @Test
     fun writeAndReadBack0() {
-        arcs.put0(l0)
-        assertThat(arcs.all0()).containsExactly(l0)
+        arcsStorage.put0(l0)
+        assertThat(arcsStorage.all0()).containsExactly(l0)
     }
 
-    @Ignore("b/157088298 - Deflake")
     @Test
     fun writeAndReadBack1() {
-        arcs.put1(l1)
-        assertThat(arcs.all1()).containsExactly(l1)
+        arcsStorage.put1(l1)
+        assertThat(arcsStorage.all1()).containsExactly(l1)
     }
 
     @Test
-    @Ignore("b/155502365")
     fun writeAndReadBack2() {
-        arcs.put2(l2)
-        assertThat(arcs.all2()).containsExactly(l2)
+        arcsStorage.put2(l2)
+        assertThat(arcsStorage.all2()).containsExactly(l2)
     }
 }
