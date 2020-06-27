@@ -22,6 +22,7 @@ import arcs.core.util.Time
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Deferred
@@ -261,6 +262,8 @@ class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T>(
         handleCallbacks.update { it.removeCallbacks(id) }
     }
 
+    private class CloseTask(block: () -> Unit) : Scheduler.Task.Processor(block)
+
     /**
      * Closes this [StorageProxy]. It will no longer receive messages from its associated [Store].
      * Attempting to perform an operation on a closed [StorageProxy] will result in an exception
@@ -268,11 +271,12 @@ class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T>(
      */
     fun close() {
         if (stateHolder.value.state == ProxyState.CLOSED) return
-        scheduler.scope.launch {
-            _crdt = null
-        }
         store.close()
         stateHolder.update { it.setState(ProxyState.CLOSED) }
+        // Schedule this to be cleared after any pending operations
+        scheduler.schedule(CloseTask {
+            _crdt = null
+        })
     }
 
     /**
@@ -456,9 +460,9 @@ class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T>(
             }
             ProxyState.NO_SYNC,
             ProxyState.READY_TO_SYNC,
-            ProxyState.CLOSED -> throw IllegalStateException(
-                "received ModelUpdate on StorageProxy in state $priorState"
-            )
+            ProxyState.CLOSED -> {
+                log.verbose { "received ModelUpdate on StorageProxy in state $priorState" }
+            }
         }
     }
 
