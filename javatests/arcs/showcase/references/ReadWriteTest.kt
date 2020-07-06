@@ -7,8 +7,10 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import arcs.android.storage.database.AndroidSqliteDatabaseManager
 import arcs.core.storage.DriverFactory
 import arcs.core.storage.ReferenceModeStore
+import arcs.core.storage.StoreWriteBack
 import arcs.core.storage.api.DriverAndKeyConfigurator
 import arcs.core.storage.database.DatabaseManager
+import arcs.core.storage.testutil.WriteBackForTesting
 import arcs.sdk.android.storage.service.testutil.TestConnectionFactory
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,6 +31,15 @@ class ReadWriteTest {
     private lateinit var dbManager: AndroidSqliteDatabaseManager
     @Before
     fun setUp() {
+        StoreWriteBack.writeBackFactoryOverride = WriteBackForTesting
+
+        // Since it's currently challenging to clean up the database between tests, we might have
+        // stale data hanging around, which can trigger a bug in ReferenceModeStore where the store
+        // will hang waiting for a reference to resolve that never will. The default timeout for
+        // giving up is 30s, which is too long for these tests. Setting the timeout to 1s allows
+        // the tests to pass even when this occurs.
+        ReferenceModeStore.BLOCKING_QUEUE_TIMEOUT_MILLIS = 1000
+
         val app = ApplicationProvider.getApplicationContext<Application>()
         dbManager = AndroidSqliteDatabaseManager(app)
         DriverAndKeyConfigurator.configure(dbManager)
@@ -43,10 +54,11 @@ class ReadWriteTest {
 
     @After
     fun tearDown() {
+        WriteBackForTesting.awaitAllIdle()
         arcsStorage.stop()
         runBlocking {
             // Attempt a resetAll().
-            // Rarely, this fails with "attempt to re-open an already-closed object"
+            // Rarely, thismfails with "attempt to re-open an already-closed object"
             // Ignoring this exception should be OK.
             try {
                 dbManager.resetAll()
@@ -62,14 +74,12 @@ class ReadWriteTest {
     private val l2 = MyLevel2("l2-1", setOf(l1))
 
     @Test
-    @Ignore("b/156993103 - Deflake")
     fun writeAndReadBack0() {
         arcsStorage.put0(l0)
         assertThat(arcsStorage.all0()).containsExactly(l0)
     }
 
     @Test
-    @Ignore("b/157088298 - Deflake")
     fun writeAndReadBack1() {
         arcsStorage.put1(l1)
         assertThat(arcsStorage.all1()).containsExactly(l1)
