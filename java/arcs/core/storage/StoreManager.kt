@@ -29,7 +29,10 @@ class StoreManager(
     val activationFactory: ActivationFactory? = null
 ) {
     private val storesMutex = Mutex()
-    private val stores by guardedBy(storesMutex, mutableMapOf<StorageKey, ActiveStore<*, *, *>>())
+    private val stores by guardedBy(
+        storesMutex,
+        mutableMapOf<StorageKey, StorageCommunicationEndpointProvider<*, *, *>>()
+    )
 
     @Suppress("UNCHECKED_CAST")
     @ExperimentalCoroutinesApi
@@ -38,13 +41,7 @@ class StoreManager(
     ) = storesMutex.withLock {
         stores.getOrPut(storeOptions.storageKey) {
             (activationFactory ?: Store.defaultFactory).invoke<Data, Op, T>(storeOptions)
-        } as ActiveStore<Data, Op, T>
-    }
-
-    suspend fun waitForIdle() {
-        storesMutex.withLock {
-            stores.values.forEach { it.idle() }
-        }
+        } as StorageCommunicationEndpointProvider<Data, Op, T>
     }
 
     /**

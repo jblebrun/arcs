@@ -47,6 +47,7 @@ import arcs.core.entity.WriteQueryCollectionHandle
 import arcs.core.entity.WriteSingletonHandle
 import arcs.core.storage.ActivationFactory
 import arcs.core.storage.ActiveStore
+import arcs.core.storage.StorageCommunicationEndpointProvider
 import arcs.core.storage.StorageKey
 import arcs.core.storage.StoreManager
 import arcs.core.storage.StoreOptions
@@ -60,8 +61,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-typealias SingletonStore<T> = ActiveStore<CrdtSingleton.Data<T>, CrdtSingleton.IOperation<T>, T?>
-typealias CollectionStore<T> = ActiveStore<CrdtSet.Data<T>, CrdtSet.IOperation<T>, Set<T>>
+typealias SingletonStore<T> =
+    StorageCommunicationEndpointProvider<CrdtSingleton.Data<T>, CrdtSingleton.IOperation<T>, T?>
+typealias CollectionStore<T> =
+    StorageCommunicationEndpointProvider<CrdtSet.Data<T>, CrdtSet.IOperation<T>, Set<T>>
 /**
  * Creates [Entity] handles based on [HandleMode], such as
  * [ReadSingletonHandle] for [HandleMode.Read]. To obtain a [HandleHolder], use

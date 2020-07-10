@@ -76,7 +76,6 @@ class HandleUtilsTest {
     @After
     fun tearDown() = runBlocking {
         scheduler.waitForIdle()
-        stores.waitForIdle()
         manager.close()
         scheduler.cancel()
     }

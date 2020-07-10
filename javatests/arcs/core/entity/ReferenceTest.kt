@@ -81,7 +81,6 @@ class ReferenceTest {
     @After
     fun tearDown() = runTest {
         scheduler.waitForIdle()
-        stores.waitForIdle()
         entityHandleManager.close()
         scheduler.cancel()
 
