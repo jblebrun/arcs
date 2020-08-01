@@ -40,6 +40,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runBlockingTest
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -298,6 +299,7 @@ class ReferenceModeStoreDatabaseIntegrationTest {
 
     @Test
     fun singletonClearFreesBackingStoreCopy() = runBlockingTest {
+        println("T1")
         val activeStore = createSingletonReferenceModeStore()
         val actor = activeStore.crdtKey
         val bob = createPersonEntity("an-id", "bob", 42)
@@ -309,6 +311,7 @@ class ReferenceModeStoreDatabaseIntegrationTest {
         ).isTrue()
         // Bob was added to the backing store.
         assertThat(activeStore.backingStore.stores.keys).containsExactly("an-id")
+        println("T2")
 
         // Remove Bob from the collection.
         val clearOp = RefModeStoreOp.SingletonClear(actor, VersionMap(actor to 1))

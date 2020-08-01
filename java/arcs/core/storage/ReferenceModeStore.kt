@@ -51,10 +51,13 @@ import arcs.core.util.TaggedLog
 import arcs.core.util.computeNotNull
 import arcs.core.util.nextSafeRandomLong
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.coroutineContext
 
 /** This is a convenience for the parameter type of [handleContainerMessage]. */
 internal typealias ContainerProxyMessage =
@@ -88,6 +91,7 @@ class ReferenceModeStore private constructor(
     val containerStore: DirectStore<CrdtData, CrdtOperation, Any?>,
     /* internal */
     val backingKey: StorageKey,
+    coroutineScope: CoroutineScope,
     backingType: Type
 ) : ActiveStore<RefModeStoreData, RefModeStoreOp, RefModeStoreOutput>(options) {
     // TODO(#5551): Consider including a hash of the storage key in log prefix.
@@ -97,6 +101,7 @@ class ReferenceModeStore private constructor(
      * A queue of incoming updates from the backing store, container store, and connected proxies.
      */
     private val receiveQueue: OperationQueue = SimpleQueue(
+        coroutineScope,
         onEmpty = {
             if (callbacks.hasBecomeEmpty()) {
                 backingStore.clearStoresCache()
@@ -115,7 +120,7 @@ class ReferenceModeStore private constructor(
     /**
      * A queue of functions that will trigger callback executions.
      */
-    private val sendQueue: OperationQueue = SimpleQueue()
+    private val sendQueue: OperationQueue = SimpleQueue(coroutineScope)
 
     /**
      * References that need to be resolved and the completion jobs to trigger once they are.
@@ -723,10 +728,14 @@ class ReferenceModeStore private constructor(
                 )
             )
 
+            // TODO: Keep moving coroutineScope creation upward until the top-level scope.
+            val job = Job(coroutineContext[Job.Key])
+            val scope = CoroutineScope(coroutineContext + job)
             return ReferenceModeStore(
                 refableOptions,
                 containerStore,
                 storageKey.backingKey,
+                scope,
                 type.containedType
             )
         }

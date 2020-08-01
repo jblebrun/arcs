@@ -39,6 +39,7 @@ import kotlin.reflect.KClass
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -609,7 +610,7 @@ class ReferenceModeStoreTest {
     }
 
     @Test
-    fun holdsOnto_containerUpdate_untilBackingDataArrives() = runBlocking {
+    fun holdsOnto_containerUpdate_untilBackingDataArrives() = runBlockingTest {
         DriverFactory.register(MockDriverProvider())
 
         val activeStore = createReferenceModeStore()
@@ -674,7 +675,7 @@ class ReferenceModeStoreTest {
 
     @Test
     @FlowPreview
-    fun backingStoresCleanedUpWhenLastCallbackRemoved() = runBlocking {
+    fun backingStoresCleanedUpWhenLastCallbackRemoved() = runBlockingTest {
         DriverFactory.register(MockDriverProvider())
         val store = createReferenceModeStore()
 
@@ -735,38 +736,42 @@ class ReferenceModeStoreTest {
     }
 
     @Test
-    fun backingStoresCleanedUpWhenLastCallbackRemovedRaces() = runBlocking {
-        DriverFactory.register(MockDriverProvider())
-        val store = createReferenceModeStore()
+    fun backingStoresCleanedUpWhenLastCallbackRemovedRaces() = runBlockingTest {
+        coroutineScope {
+            DriverFactory.register(MockDriverProvider())
+            val store = createReferenceModeStore()
 
-        val callbackJob = launch {
-            for (i in 0..100) {
-                val preToken = store.on(ProxyCallback {})
-                delay(1)
-                store.off(preToken)
+            coroutineScope {
+                launch {
+                    for (i in 0..100) {
+                        val preToken = store.on(ProxyCallback {})
+                        delay(1)
+                        store.off(preToken)
+                    }
+                    println("LAUNCHED ALL ONOFFS")
+                }
+
+            launch {
+                for (i in 0..100) {
+                    val collection = CrdtSet<RawEntity>()
+                    val entity = createPersonEntity("an-id", "bob-$i", 42)
+
+                    collection.applyOperation(
+                        CrdtSet.Operation.Add("me", VersionMap("me" to 1), entity)
+                    )
+
+                    store.onProxyMessage(
+                        ProxyMessage.ModelUpdate(RefModeStoreData.Set(collection.data), 1)
+                    )
+                }
+                println("LAUNCHED ALL PMS")
             }
+            }
+            println("AWAIT IDLE")
+            store.idle()
+            assertThat(store.backingStore.stores.size).isEqualTo(0)
         }
 
-        val dataJob = launch {
-            for (i in 0..100) {
-                val collection = CrdtSet<RawEntity>()
-                val entity = createPersonEntity("an-id", "bob-$i", 42)
-
-                collection.applyOperation(
-                    CrdtSet.Operation.Add("me", VersionMap("me" to 1), entity)
-                )
-
-                store.onProxyMessage(
-                    ProxyMessage.ModelUpdate(RefModeStoreData.Set(collection.data), 1)
-                )
-            }
-        }
-
-        callbackJob.join()
-        dataJob.join()
-
-        store.idle()
-        assertThat(store.backingStore.stores.size).isEqualTo(0)
     }
 
     // region Helpers

@@ -1,11 +1,11 @@
 package arcs.core.storage.util
 
-import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.selects.select
 
 /**
  * A very basic implementation of [OperationQueue]. It dispatches jobs on coroutines in the
@@ -15,13 +15,25 @@ import kotlinx.coroutines.sync.withLock
  * any drain cycle.
  */
 class SimpleQueue(
+    coroutineScope: CoroutineScope,
     private val onEmpty: (suspend () -> Unit)? = null
 ) : OperationQueue {
 
-    private val mutex = Mutex()
-    @OptIn(ExperimentalStdlibApi::class)
-    private val queue = ArrayDeque<suspend () -> Unit>()
-    private var drainJob: Job? = null
+    private val queue = Channel<suspend () -> Unit>()
+    // Holds up to one "empty" job, which will be selected whenever the queue goes empty
+    private val empty = Channel<suspend () -> Unit>(1)
+
+    @Suppress("EXPERIMENTAL_API_USAGE", "DEPRECATION")
+    private val drainJob = coroutineScope.launch {
+        while (isActive) {
+            select<Unit> {
+                // If a job is present, this gets chosen first.
+                queue.onReceiveOrNull { it?.invoke() ?: cancel() }
+                // If no job was present, there should be 1 empty func pending here.
+                empty.onReceiveOrNull { it?.invoke() }
+            }
+        }
+    }
 
     /**
      * Places the provided block on the internal operation queue.
@@ -31,39 +43,19 @@ class SimpleQueue(
      *
      * It's safe to call this method from any thread/coroutine.
      */
-    override suspend fun enqueue(op: Op) = mutex.withLock {
-        // Update the queue, and at the same time, check if any drain coroutines are running.
-        queue += op
-
-        if (drainJob == null) {
-            drainJob = CoroutineScope(coroutineContext).launch {
-                drain()
-            }
-        }
+    override suspend fun enqueue(op: Op) {
+        queue.send(op)
+        onEmpty?.let { empty.offer(it) }
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
-    private suspend fun drain() {
-        do {
-            val item = mutex.withLock {
-                if (queue.size > 0) {
-                    queue.removeAt(0)
-                } else {
-                    // We are done: trigger onEmpty, and null out the drain job to signal that
-                    // another should be started.
-                    // It's ok if a new one starts before this completes, since it will just
-                    // be exiting.
-                    // We call onEmpty below, outside of the lock, so it's ok to call `enqueue`
-                    // from an `onEmpty` method
-                    drainJob = null
-                    null
-                }
-            }
+    fun close() {
+        queue.close()
+    }
 
-            when (item) {
-                null -> onEmpty?.invoke()
-                else -> item.invoke()
-            }
-        } while (item != null)
+    suspend fun join() {
+        drainJob.join()
     }
 }
+
+fun CoroutineScope.simpleQueue(onEmpty: (suspend () -> Unit)? = null) =
+    SimpleQueue(this, onEmpty)

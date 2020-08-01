@@ -16,16 +16,18 @@ import arcs.core.common.ReferenceId
 import arcs.core.crdt.VersionMap
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runBlockingTest
 import org.junit.Test
 
 /** Tests for the [HoldQueue]. */
 @ExperimentalCoroutinesApi
 class HoldQueueTest {
-    private val holdQueue = HoldQueue(SimpleQueue())
 
     @Test
     fun enqueue_enqueuesSingleEntity() = runBlockingTest {
+        val queue = simpleQueue()
+        val holdQueue = HoldQueue(queue)
         val versions = VersionMap("alice" to 1, "bob" to 1)
         val callback = suspend { }
 
@@ -41,10 +43,13 @@ class HoldQueueTest {
         assertThat(queueData.size).isEqualTo(1)
         assertThat(queueData).containsExactly("foo", listOf(expectedRecord))
         Unit
+        queue.close()
     }
 
     @Test
     fun enqueue_enqueuesMultipleEntities() = runBlockingTest {
+        val queue = simpleQueue()
+        val holdQueue = HoldQueue(queue)
         val versions = VersionMap("alice" to 1, "bob" to 2)
         val callback = suspend { }
 
@@ -70,10 +75,13 @@ class HoldQueueTest {
             expectedRecords
         )
         Unit
+        queue.close()
     }
 
     @Test
     fun enqueue_appendsToExistingReferenceRecordList() = runBlockingTest {
+        val queue = simpleQueue()
+        val holdQueue = HoldQueue(queue)
         val versions1 = VersionMap("alice" to 1, "bob" to 2)
         val versions2 = VersionMap("alice" to 2, "bob" to 2)
         val callback = suspend { }
@@ -94,10 +102,13 @@ class HoldQueueTest {
         val queueData = holdQueue.queue
 
         assertThat(queueData).containsExactly("foo", expectedRecords)
+        queue.close()
     }
 
     @Test
     fun processReferenceId_callsOnRelease_forSingleEntity() = runBlockingTest {
+        val queue = simpleQueue()
+        val holdQueue = HoldQueue(queue)
         val versions = VersionMap("alice" to 1, "bob" to 2)
         var called = false
         val callback = suspend {
@@ -112,10 +123,13 @@ class HoldQueueTest {
         holdQueue.processReferenceId("foo", versions)
 
         assertThat(called).isTrue()
+        queue.close()
     }
 
     @Test
     fun processReferenceId_doesNotCallOnRelease_forOlderVersions() = runBlockingTest {
+        val queue = simpleQueue()
+        val holdQueue = HoldQueue(queue)
         val versions = VersionMap("alice" to 1, "bob" to 2)
         var called = false
         val callback = suspend {
@@ -130,10 +144,13 @@ class HoldQueueTest {
         holdQueue.processReferenceId("foo", versions)
 
         assertThat(called).isFalse()
+        queue.close()
     }
 
     @Test
     fun processReferenceId_onlyCallsOnRelease_whenRecordIsEmpty() = runBlockingTest {
+        val queue = simpleQueue()
+        val holdQueue = HoldQueue(queue)
         val versions = VersionMap("alice" to 1, "bob" to 2)
         var called = false
         val callback = suspend {
@@ -162,6 +179,7 @@ class HoldQueueTest {
         holdQueue.processReferenceId("bar", versions)
         assertThat(called).isTrue()
         assertThat(holdQueue.queue).isEmpty()
+        queue.close()
     }
 
     private data class Reference(override val id: ReferenceId) : Referencable
