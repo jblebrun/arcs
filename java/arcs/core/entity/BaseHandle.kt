@@ -10,6 +10,7 @@
  */
 package arcs.core.entity
 
+import arcs.core.common.Storable
 import arcs.core.storage.StorageProxy
 import arcs.core.storage.StorageProxy.StorageEvent
 import arcs.core.storage.referencemode.ReferenceModeStorageKey

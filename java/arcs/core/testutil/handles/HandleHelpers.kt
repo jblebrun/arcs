@@ -18,7 +18,7 @@ import arcs.core.entity.ReadCollectionHandle
 import arcs.core.entity.ReadSingletonHandle
 import arcs.core.entity.ReadableHandle
 import arcs.core.entity.Reference
-import arcs.core.entity.Storable
+import arcs.core.common.Storable
 import arcs.core.entity.WriteCollectionHandle
 import arcs.core.entity.WriteSingletonHandle
 import kotlinx.coroutines.joinAll

@@ -13,6 +13,7 @@ package arcs.core.entity
 
 import arcs.core.common.Id
 import arcs.core.common.Referencable
+import arcs.core.common.Storable
 import arcs.core.data.Capability.Ttl
 import arcs.core.data.RawEntity
 import arcs.core.data.Schema
@@ -26,10 +27,10 @@ interface Entity : Storable {
     val entityId: String?
 
     /** The creation timestamp of the entity. Set at the same time the ID is set. */
-    val creationTimestamp: Long
+    override val creationTimestamp: Long
 
     /** The expiration timestamp of the entity. Set at the same time the ID is set. */
-    val expirationTimestamp: Long
+    override val expirationTimestamp: Long
 
     /**
      * Generates a new ID for the Entity, if it doesn't already have one. Also sets creation

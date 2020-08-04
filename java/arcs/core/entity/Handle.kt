@@ -11,6 +11,7 @@
 
 package arcs.core.entity
 
+import arcs.core.common.Storable
 import arcs.core.data.CollectionType
 import arcs.core.data.EntityType
 import arcs.core.data.HandleMode
@@ -65,9 +66,6 @@ suspend fun <T : Handle> T.awaitReady(): T = suspendCancellableCoroutine { cont 
         if (cont.isActive) cont.resume(this@awaitReady)
     }
 }
-
-/** Base interface for types that can be stored in a [Handle] (see [Entity] and [Reference]). */
-interface Storable
 
 /** Configuration for a [Handle]. */
 data class HandleSpec(

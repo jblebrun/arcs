@@ -1,5 +1,6 @@
 package arcs.core.entity
 
+import arcs.core.common.Storable
 import arcs.core.data.FieldType
 import arcs.core.data.RawEntity
 import arcs.core.data.Schema
@@ -9,7 +10,8 @@ import arcs.core.data.SchemaName
 /**
  * An [Entity] similar to [DummyEntity], except with only a subset of its properties.
  */
-class DummyVariableEntity : VariableEntityBase(ENTITY_CLASS_NAME, SCHEMA), Storable {
+class DummyVariableEntity : VariableEntityBase(ENTITY_CLASS_NAME, SCHEMA),
+                            Storable {
     var text: String? by SingletonProperty()
     var ref: Reference<DummyEntity>? by SingletonProperty()
     var bools: Set<Boolean> by CollectionProperty()

@@ -11,6 +11,7 @@
 package arcs.core.entity
 
 import arcs.core.common.Referencable
+import arcs.core.common.Storable
 import arcs.core.crdt.CrdtSingleton
 import arcs.core.data.RawEntity
 import arcs.core.storage.StorageProxy

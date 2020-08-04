@@ -15,17 +15,9 @@ package arcs.core.common
 typealias ReferenceId = String
 
 /** Represents a referencable object, ie. one which can be referenced by a unique [id]. */
-interface Referencable {
+interface Referencable : Storable {
     /** Unique identifier of the Referencable object. */
     val id: ReferenceId
-
-    /** Creation timestamp (in millis) on the Referencable object. */
-    val creationTimestamp: Long
-        get() = TODO("not implemented")
-
-    /** Expiration timestamp (in millis) on the Referencable object. */
-    val expirationTimestamp: Long
-        get() = TODO("not implemented")
 
     /**
      * If the implementation of [Referencable] supports it, this function returns a realized-version

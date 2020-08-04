@@ -40,7 +40,7 @@ import arcs.core.entity.ReadWriteSingletonHandle
 import arcs.core.entity.ReferenceStorageAdapter
 import arcs.core.entity.SingletonHandle
 import arcs.core.entity.SingletonProxy
-import arcs.core.entity.Storable
+import arcs.core.common.Storable
 import arcs.core.entity.StorageAdapter
 import arcs.core.entity.WriteCollectionHandle
 import arcs.core.entity.WriteQueryCollectionHandle

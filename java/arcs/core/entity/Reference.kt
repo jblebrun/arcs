@@ -12,6 +12,7 @@
 package arcs.core.entity
 
 import arcs.core.common.Referencable
+import arcs.core.common.Storable
 import arcs.core.data.Capability.Ttl
 import arcs.core.storage.Reference as StorageReference
 import arcs.core.util.Time
@@ -27,9 +28,9 @@ class Reference<T : Entity>(
     /** The entity ID for the referenced entity. */
     val entityId = storageReference.id
 
-    val creationTimestamp
+    override val creationTimestamp
         get() = storageReference.creationTimestamp
-    val expirationTimestamp
+    override val expirationTimestamp
         get() = storageReference.expirationTimestamp
 
     /** Returns the [Entity] pointed to by this reference. */

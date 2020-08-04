@@ -11,6 +11,8 @@
 
 package arcs.core.entity
 
+import arcs.core.common.Storable
+
 /** A one element Tuple of [Storable]s */
 data class Tuple1<
     out A : Storable

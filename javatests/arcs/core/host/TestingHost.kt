@@ -2,7 +2,7 @@ package arcs.core.host
 
 import arcs.core.common.ArcId
 import arcs.core.data.Plan
-import arcs.core.entity.Storable
+import arcs.core.common.Storable
 import arcs.core.host.api.Particle
 import arcs.core.util.Time
 import arcs.jvm.util.testutil.FakeTime

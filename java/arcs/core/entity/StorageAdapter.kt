@@ -12,6 +12,7 @@ package arcs.core.entity
 
 import arcs.core.common.Id
 import arcs.core.common.Referencable
+import arcs.core.common.Storable
 import arcs.core.data.Capability.Ttl
 import arcs.core.data.RawEntity
 import arcs.core.storage.Reference as StorageReference
