@@ -13,7 +13,6 @@ package arcs.core.storage.testutil
 
 import arcs.core.storage.StoreWriteBack
 import arcs.core.storage.WriteBack
-import arcs.core.storage.WriteBackFactory
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking

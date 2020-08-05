@@ -49,9 +49,9 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
     /* internal */
     val localModel: CrdtModel<Data, Op, T>,
     /* internal */
-    val driver: Driver<Data>
-) : ActiveStore<Data, Op, T>(options),
-    WriteBack by StoreWriteBack.create(driver.storageKey.protocol) {
+    val driver: Driver<Data>,
+    private val writeback: WriteBack
+) : ActiveStore<Data, Op, T>(options) {
     override val versionToken: String?
         get() = driver.token
 
@@ -85,7 +85,7 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
     )
 
     private val storeIdlenessFlow =
-        combine(stateFlow, writebackIdlenessFlow) { state, writebackIsIdle ->
+        combine(stateFlow, writeback.idlenessFlow) { state, writebackIsIdle ->
             state is State.Idle<*> && writebackIsIdle
         }
 
@@ -122,7 +122,7 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
             stateChannel.offer(State.Closed())
             stateChannel.close()
             state.value = State.Closed()
-            closeWriteBack()
+            writeback.close()
             runBlocking {
                 driver.close()
             }
@@ -165,7 +165,7 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
 
                         // As the localModel has already been applied with new operations,
                         // leave the flush job to write-back threads.
-                        asyncFlush {
+                        writeback.asyncFlush {
                             processModelChange(
                                 change,
                                 otherChange = null,
@@ -183,7 +183,7 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
                 }
                 // As the localModel has already been merged with new model updates,
                 // leave the flush job to write-back threads.
-                asyncFlush {
+                writeback.asyncFlush {
                     processModelChange(
                         modelChange,
                         otherChange,
@@ -498,7 +498,8 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
 
         @Suppress("UNCHECKED_CAST")
         suspend fun <Data : CrdtData, Op : CrdtOperation, T> create(
-            options: StoreOptions
+            options: StoreOptions,
+            writebackProvider: WritebackProvider
         ): DirectStore<Data, Op, T> {
             val crdtType = requireNotNull(options.type as CrdtModelType<Data, Op, T>) {
                 "Type not supported: ${options.type}"
@@ -512,10 +513,13 @@ class DirectStore<Data : CrdtData, Op : CrdtOperation, T> /* internal */ constru
                 ) as? Driver<Data>
             ) { "No driver exists to support storage key ${options.storageKey}" }
 
+            val writeback = writebackProvider.create()
+
             return DirectStore(
                 options,
                 localModel = crdtType.createCrdtModel(),
-                driver = driver
+                driver = driver,
+                writeback = writeback
             ).also { store ->
                 driver.registerReceiver(options.versionToken) { data, version ->
                     store.onReceive(data, version)
