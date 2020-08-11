@@ -31,15 +31,12 @@ import arcs.core.data.ReferenceType
 import arcs.core.data.SingletonType
 import arcs.core.data.util.ReferencableList
 import arcs.core.entity.Entity
-import arcs.core.storage.referencemode.BridgingOperation
 import arcs.core.storage.referencemode.RefModeStoreData
 import arcs.core.storage.referencemode.RefModeStoreOp
 import arcs.core.storage.referencemode.RefModeStoreOutput
 import arcs.core.storage.referencemode.ReferenceModeStorageKey
 import arcs.core.storage.referencemode.sanitizeForRefModeStore
-import arcs.core.storage.referencemode.toBridgingData
 import arcs.core.storage.referencemode.toBridgingOp
-import arcs.core.storage.referencemode.toBridgingOps
 import arcs.core.storage.referencemode.toReferenceModeMessage
 import arcs.core.storage.util.HoldQueue
 import arcs.core.storage.util.OperationQueue
@@ -245,31 +242,36 @@ class ReferenceModeStore<Data : CrdtData, Op : CrdtOperation, T : RawEntity> pri
         return when (proxyMessage) {
             is ProxyMessage.Operations -> {
                 proxyMessage.operations.all { op ->
-                    when (op) {
+                    val containerOp = when (op) {
                         is CrdtSingleton.Operation.Update<*> -> {
                             backingStore.clearStoresCache()
                             updateBackingStore(op.value)
+                            // Container to ref value
                         }
                         is CrdtSingleton.Operation.Clear<*> -> {
                             // Free up the memory used by the previous instance (for a Singleton,
                             // there would be only one instance).
                             backingStore.clearStoresCache()
+                            // Container to clear
                         }
 
                         is CrdtSet.Operation.Add<*> -> {
                             updateBackingStore(op.added)
+                            // Container to add ref
                         }
 
                         is CrdtSet.Operation.Remove<*> -> {
                             op.removed?.let { clearEntityInBackingStore(it)}
+                            // Container to remove ref
                         }
 
                         is CrdtSet.Operation.Clear<*> -> {
                             clearAllEntitiesInBackingStore()
+                            // Container to remove all
                         }
                     }
                     containerStore.onProxyMessage(
-                        ProxyMessage.Operations(listOf(op.containerOp), proxyMessage.id)
+                        ProxyMessage.Operations(listOf(containerOp), proxyMessage.id)
                     )
                 }
             }
@@ -702,7 +704,7 @@ class ReferenceModeStore<Data : CrdtData, Op : CrdtOperation, T : RawEntity> pri
         /* internal */ var BLOCKING_QUEUE_TIMEOUT_MILLIS = 30000L
 
         @Suppress("UNCHECKED_CAST")
-        suspend fun <Data : CrdtData, Op : CrdtOperationAtTime, T : Entity>create(
+        suspend fun <Data : CrdtData, Op : CrdtOperationAtTime, T : RawEntity>create(
             options: StoreOptions
         ): ReferenceModeStore<Data, Op, T> {
             val refableOptions =
@@ -722,21 +724,25 @@ class ReferenceModeStore<Data : CrdtData, Op : CrdtOperation, T : RawEntity> pri
             val storageKey = requireNotNull(options.storageKey as? ReferenceModeStorageKey) {
                 "StorageKey ${options.storageKey} is not a ReferenceModeStorageKey"
             }
-            val refType = if (options.type is CollectionType<*>) {
-                CollectionType(ReferenceType(type.containedType))
+            val containerStore = if (options.type is CollectionType<*>) {
+                DirectStore.create<CrdtSingleton, CrdtOperation, Any?>(
+                    StoreOptions(
+                        storageKey = storageKey.storageKey,
+                        type = CollectionType(ReferenceType(type.containedType)),
+                        versionToken = options.versionToken
+                    )
+                )
             } else {
-                SingletonType(ReferenceType(type.containedType))
+                DirectStore.create<CrdtData, CrdtOperation, Any?>(
+                    StoreOptions(
+                        storageKey = storageKey.storageKey,
+                        type = SingletonType(ReferenceType(type.containedType)),
+                        versionToken = options.versionToken
+                    )
+                )
             }
 
-            val containerStore = DirectStore.create<CrdtData, CrdtOperation, Any?>(
-                StoreOptions(
-                    storageKey = storageKey.storageKey,
-                    type = refType,
-                    versionToken = options.versionToken
-                )
-            )
-
-            return ReferenceModeStore(
+            return ReferenceModeStore<Data, Op, T>(
                 refableOptions,
                 containerStore,
                 storageKey.backingKey,
