@@ -79,7 +79,7 @@ class EntityHandleManager(
     private val arcId: String = Id.Generator.newSession().newArcId("arc").toString(),
     private val hostId: String = "nohost",
     private val time: Time,
-    private val scheduler: Scheduler,
+    override val scheduler: Scheduler,
     stores: StoreManager = StoreManager(),
     private val idGenerator: Id.Generator = Id.Generator.newSession(),
     private val analytics: Analytics? = null

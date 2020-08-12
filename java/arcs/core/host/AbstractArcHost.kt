@@ -70,9 +70,50 @@ abstract class AbstractArcHost(
      * here.
      */
     updateArcHostContextCoroutineContext: CoroutineContext,
-    protected val schedulerProvider: SchedulerProvider,
+    private val handleManagerProvider: HandleManagerProvider,
     vararg initialParticles: ParticleRegistration
 ) : ArcHost {
+
+    @Suppress("DEPRECATION")
+    class LegacyHandleManagerProvider(
+        private val schedulerProvider: SchedulerProvider
+    ) : HandleManagerProvider {
+        lateinit var host: AbstractArcHost
+        override fun create(arcId: String, hostId: String): HandleManager {
+            return EntityHandleManager(
+                arcId,
+                hostId,
+                host.platformTime,
+                schedulerProvider(arcId),
+                host.stores
+            )
+        }
+        override fun close() {
+            schedulerProvider.cancelAll()
+        }
+    }
+
+    @Deprecated("Use primary constructor")
+    constructor(
+        coroutineContext: CoroutineContext,
+        /**
+         * When arc states change, the state changes are serialized to handles. This serialization will
+         * happen asynchronously from the state change operation, on the [CoroutineContext] provided
+         * here.
+         */
+        updateArcHostContextCoroutineContext: CoroutineContext,
+        schedulerProvider: SchedulerProvider,
+        vararg initialParticles: ParticleRegistration
+    ) : this(
+        coroutineContext,
+        updateArcHostContextCoroutineContext,
+        LegacyHandleManagerProvider(schedulerProvider),
+        *initialParticles
+    ) {
+        (handleManagerProvider as LegacyHandleManagerProvider).host = this
+    }
+
+
     private val log = TaggedLog { "AbstractArcHost" }
     private val particleConstructors: MutableMap<ParticleIdentifier, ParticleConstructor> =
         mutableMapOf()
@@ -210,7 +251,7 @@ abstract class AbstractArcHost(
         pausedArcs.clear()
         contextSerializationChannel.cancel()
         resurrectionScope.cancel()
-        schedulerProvider.cancelAll()
+        handleManagerProvider.close()
     }
 
     /**
@@ -258,7 +299,7 @@ abstract class AbstractArcHost(
 
     private fun createArcHostContext(arcId: String) = ArcHostContext(
         arcId = arcId,
-        handleManager = entityHandleManager(arcId)
+        handleManager = handleManagerProvider.create(arcId, hostId)
     )
 
     override suspend fun addOnArcStateChange(
@@ -301,7 +342,7 @@ abstract class AbstractArcHost(
     private suspend fun createArcHostContextParticle(
         arcHostContext: ArcHostContext
     ): ArcHostContextParticle {
-        val handleManager = entityHandleManager("$hostId-${arcHostContext.arcId}")
+        val handleManager = handleManagerProvider.create("$hostId-${arcHostContext.arcId}", hostId)
 
         return ArcHostContextParticle(hostId, handleManager, this::instantiateParticle).apply {
             val partition = createArcHostContextPersistencePlan(
@@ -440,7 +481,7 @@ abstract class AbstractArcHost(
         val particle = instantiateParticle(ParticleIdentifier.from(spec.location), spec)
 
         val particleContext = existingParticleContext?.copyWith(particle)
-            ?: ParticleContext(particle, spec, schedulerProvider(context.arcId))
+            ?: ParticleContext(particle, spec, context.handleManager.scheduler)
 
         if (particleContext.particleState == ParticleState.MaxFailed) {
             // Don't try recreating the particle anymore.
@@ -600,6 +641,7 @@ abstract class AbstractArcHost(
      * Until Kotlin Multiplatform adds a common API for retrieving time, each platform that
      * implements an [ArcHost] needs to supply an implementation of the [Time] interface.
      */
+    @Deprecated("pass a hmp")
     abstract val platformTime: Time
 
     open val arcHostContextCapability = Capabilities(Shareable(true))
@@ -608,21 +650,11 @@ abstract class AbstractArcHost(
         registeredParticles().contains(ParticleIdentifier.from(particle.location))
 
     /**
-     * Return an instance of [EntityHandleManager] to be used to create [Handle]s.
-     */
-    open fun entityHandleManager(arcId: String): HandleManager = EntityHandleManager(
-        arcId,
-        hostId,
-        platformTime,
-        schedulerProvider(arcId),
-        stores
-    )
-
-    /**
      * The map of [Store] objects that this [ArcHost] will use. By default, it uses a shared
      * singleton defined statically by this package.
      */
-    open val stores = singletonStores
+    @Deprecated("pass a hmp")
+    open val stores = StoreManager()
 
     /**
      * Instantiate a [Particle] implementation for a given [ParticleIdentifier].
@@ -635,17 +667,5 @@ abstract class AbstractArcHost(
     ): Particle {
         return particleConstructors[identifier]?.invoke(spec)
             ?: throw IllegalArgumentException("Particle $identifier not found.")
-    }
-
-    companion object {
-        /**
-         * Shared [StoreManager] instance. This is used to share [Store]s among multiple [ArcHost]s or
-         * even across different arcs. On Android, [StorageService] runs as a single process so all
-         * [ArcHost]s share the same Storage layer and this singleton is not needed, but on other
-         * platforms the [StoreManager] object provides Android-like functionality. If your platform
-         * supports its own [Service]-level analogue like Android, override this method to return
-         * a new instance each time.
-         */
-        val singletonStores = StoreManager()
     }
 }
