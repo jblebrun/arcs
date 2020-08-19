@@ -8,6 +8,9 @@ arcs_kt_jvm_library(
     name = "testutil",
     testonly = True,
     srcs = glob(["*.kt"]),
+    exports = [
+        "//java/arcs/core/util"
+    ],
     deps = [
         "//java/arcs/core/util",
         "//third_party/java/junit:junit-android",
