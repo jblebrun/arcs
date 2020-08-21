@@ -67,9 +67,9 @@ class CapabilitiesResolverTest {
 
     @Test
     fun capabilitiesResolver_failsNonUniqueRegistration() {
-        VolatileStorageKey.registerKeyCreator()
+        CapabilitiesResolver.reset(VolatileStorageKey.factory)
         assertFailsWith<IllegalArgumentException> {
-            VolatileStorageKey.registerKeyCreator()
+            CapabilitiesResolver.registerStorageKeyFactory(VolatileStorageKey.factory)
         }
     }
 
@@ -97,7 +97,7 @@ class CapabilitiesResolverTest {
     @Test
     fun capabilitiesResolver_createsVolatileKeys() {
         // Register volatile storage key factory.
-        VolatileStorageKey.registerKeyCreator()
+        CapabilitiesResolver.reset(VolatileStorageKey.factory)
         val resolver = CapabilitiesResolver(Options(ArcId.newForTest("test")))
         // Verify only volatile (in-memory, no ttl) storage key can be created.
         verifyStorageKey<VolatileStorageKey>(
@@ -119,7 +119,10 @@ class CapabilitiesResolverTest {
 
     @Test
     fun capabilitiesResolver_createsDatabaseKeys() {
-        DatabaseStorageKey.registerKeyCreator()
+        CapabilitiesResolver.reset(
+            DatabaseStorageKey.Memory.factory,
+            DatabaseStorageKey.Persistent.factory
+        )
         val resolver = CapabilitiesResolver(Options(ArcId.newForTest("test")))
         verifyStorageKey<DatabaseStorageKey.Memory>(
             resolver.createStorageKey(unspecified, entityType, handleId)
@@ -167,10 +170,10 @@ class CapabilitiesResolverTest {
 
     @Test
     fun capabilitiesResolver_createWithCustomFactories() {
-        VolatileStorageKey.registerKeyCreator()
+        CapabilitiesResolver.reset(VolatileStorageKey.factory)
         val resolver = CapabilitiesResolver(
             Options(ArcId.newForTest("test")),
-            listOf(DatabaseStorageKey.Memory.Factory())
+            listOf(DatabaseStorageKey.Memory.factory)
         )
         verifyStorageKey<VolatileStorageKey>(
             resolver.createStorageKey(unspecified, entityType, handleId)

@@ -17,6 +17,7 @@ STORE_SRCS = [
 
 STORAGE_KEY_SRCS = [
     "StorageKey.kt",
+    "StorageKeySpec.kt",
     "StorageKeyParser.kt",
     "StorageKeyUtils.kt",
 ]

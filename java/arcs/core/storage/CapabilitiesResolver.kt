@@ -27,14 +27,14 @@ import arcs.core.type.Type
  */
 class CapabilitiesResolver(
     private val options: Options,
-    private val factories: Map<String, StorageKeyFactory>,
+    private val factories: Map<String, StorageKeyFactory<*>>,
     private val selector: FactorySelector = SimpleCapabilitiesSelector()
 ) {
     constructor(
         options: Options,
-        factoriesList: List<StorageKeyFactory> = listOf(),
+        factoriesList: List<StorageKeyFactory<*>> = listOf(),
         selector: FactorySelector = SimpleCapabilitiesSelector()
-    ) : this(options, CapabilitiesResolver.getFactoryMap(factoriesList), selector)
+    ) : this(options, getFactoryMap(factoriesList), selector)
 
     /** Options used to construct [CapabilitiesResolver]. */
     data class Options(val arcId: ArcId)
@@ -50,8 +50,8 @@ class CapabilitiesResolver(
         return createStorageKeyWithFactory(factory, type, handleId)
     }
 
-    private fun createStorageKeyWithFactory(
-        factory: StorageKeyFactory,
+    private fun <T : StorageKey> createStorageKeyWithFactory(
+        factory: StorageKeyFactory<T>,
         type: Type,
         handleId: String
     ): StorageKey {
@@ -92,7 +92,7 @@ class CapabilitiesResolver(
      * An interface for selecting a factory, if more than one are available for [Capabilities].
      */
     interface FactorySelector {
-        fun select(factories: Collection<StorageKeyFactory>): StorageKeyFactory
+        fun select(factories: Collection<StorageKeyFactory<*>>): StorageKeyFactory<*>
     }
 
     /**
@@ -102,7 +102,7 @@ class CapabilitiesResolver(
     class SimpleCapabilitiesSelector(
         val sortedProtocols: Array<String> = arrayOf("volatile", "ramdisk", "memdb", "db")
     ) : FactorySelector {
-        override fun select(factories: Collection<StorageKeyFactory>): StorageKeyFactory {
+        override fun select(factories: Collection<StorageKeyFactory<*>>): StorageKeyFactory<*> {
             require(factories.isNotEmpty()) { "Cannot select from empty factories list" }
             val compareProtocol = compareBy { protocol: String ->
                 val index = sortedProtocols.indexOf(protocol)
@@ -118,26 +118,51 @@ class CapabilitiesResolver(
     }
 
     companion object {
-        private val defaultStorageKeyFactories = mutableMapOf<String, StorageKeyFactory>()
+        private val defaultStorageKeyFactories = mutableMapOf<String, StorageKeyFactory<*>>()
 
-        fun registerStorageKeyFactory(factory: StorageKeyFactory) {
-            require(defaultStorageKeyFactories[factory.protocol] == null) {
-                "Storage key factory for '$factory.protocol' already registered"
+        /**
+         * Add the provided [StorageKeyFactory] to default global map of factories.
+         *
+         * It's safe to call this from any thread.
+         */
+        fun registerStorageKeyFactory(factory: StorageKeyFactory<*>) {
+            synchronized(defaultStorageKeyFactories) {
+                require(!defaultStorageKeyFactories.contains(factory.protocol)) {
+                    "Storage key factory for '$factory.protocol' already registered"
+                }
+                defaultStorageKeyFactories[factory.protocol] = factory
             }
-            defaultStorageKeyFactories[factory.protocol] = factory
         }
 
-        fun reset() {
-            defaultStorageKeyFactories.clear()
+        /**
+         * Reset the registered list of [StorageKeyFactory]s to the items provided.
+         *
+         * It's safe to call this from any thread.
+         */
+        fun reset(vararg factories: StorageKeyFactory<*>) {
+            synchronized(defaultStorageKeyFactories) {
+                defaultStorageKeyFactories.clear()
+                factories.forEach { registerStorageKeyFactory(it) }
+            }
         }
 
-        fun getFactoryMap(factoriesList: List<StorageKeyFactory>): Map<String, StorageKeyFactory> {
+        /**
+         * Get a map of [StorageKeyFactory] that contains the currently globally-registered
+         * defaults as well as the ones provided to the method call.
+         *
+         * It's safe to call this from any thread.
+         */
+        fun getFactoryMap(
+            factoriesList: List<StorageKeyFactory<*>>
+        ): Map<String, StorageKeyFactory<*>> {
             require(factoriesList.distinctBy { it.protocol }.size == factoriesList.size) {
                 "Storage keys protocol must be unique $factoriesList."
             }
             val factories = factoriesList.associateBy { it.protocol }.toMutableMap()
-            CapabilitiesResolver.defaultStorageKeyFactories.forEach { (protocol, factory) ->
-                factories.getOrPut(protocol) { factory }
+            synchronized(defaultStorageKeyFactories) {
+                defaultStorageKeyFactories.forEach { (protocol, factory) ->
+                    factories.getOrPut(protocol) { factory }
+                }
             }
             return factories
         }

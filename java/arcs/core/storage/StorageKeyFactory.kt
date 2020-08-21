@@ -15,9 +15,9 @@ import arcs.core.common.ArcId
 import arcs.core.data.Capabilities
 import arcs.core.data.Schema
 
-abstract class StorageKeyFactory(val protocol: String, val capabilities: Capabilities) {
+abstract class StorageKeyFactory<T : StorageKey>(val protocol: String, val capabilities: Capabilities) {
 
-    abstract fun create(options: StorageKeyOptions): StorageKey
+    abstract fun create(options: StorageKeyOptions): T
 
     /**
      * Returns true, if the current storage key class supports the given set of [Capabilities].

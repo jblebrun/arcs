@@ -57,27 +57,27 @@ sealed class DatabaseStorageKey(
 
         override fun toString() = super.toString()
 
-        class Factory : StorageKeyFactory(
-            protocol,
-            Capabilities(
-                listOf(
-                    Capability.Persistence.ON_DISK,
-                    Capability.Ttl.ANY,
-                    Capability.Queryable.ANY,
-                    Capability.Shareable.ANY
-                )
-            )
-        ) {
-            override fun create(options: StorageKeyOptions): StorageKey {
-                return Persistent(options.location, options.entitySchema.hash)
-            }
-        }
-
         companion object : StorageKeySpec<Persistent> {
             /** Protocol to be used with the database driver for persistent databases. */
             override val protocol = Protocols.DATABASE_DRIVER
 
             override fun parse(rawKeyString: String) = fromString<Persistent>(rawKeyString)
+
+            val factory = object : StorageKeyFactory<Persistent>(
+                protocol,
+                Capabilities(
+                    listOf(
+                        Capability.Persistence.ON_DISK,
+                        Capability.Ttl.ANY,
+                        Capability.Queryable.ANY,
+                        Capability.Shareable.ANY
+                    )
+                )
+            ) {
+                override fun create(options: StorageKeyOptions): Persistent {
+                    return Persistent(options.location, options.entitySchema.hash)
+                }
+            }
         }
     }
 
@@ -91,27 +91,27 @@ sealed class DatabaseStorageKey(
 
         override fun toString() = super.toString()
 
-        class Factory : StorageKeyFactory(
-            protocol,
-            Capabilities(
-                listOf(
-                    Capability.Persistence.IN_MEMORY,
-                    Capability.Ttl.ANY,
-                    Capability.Queryable.ANY,
-                    Capability.Shareable.ANY
-                )
-            )
-        ) {
-            override fun create(options: StorageKeyOptions): StorageKey {
-                return Memory(options.location, options.entitySchema.hash)
-            }
-        }
-
         companion object : StorageKeySpec<Memory> {
             /** Protocol to be used with the database driver for in-memory databases. */
             override val protocol = Protocols.MEMORY_DATABASE_DRIVER
 
             override fun parse(rawKeyString: String) = fromString<Memory>(rawKeyString)
+
+            val factory = object : StorageKeyFactory<Memory>(
+                protocol,
+                Capabilities(
+                    listOf(
+                        Capability.Persistence.IN_MEMORY,
+                        Capability.Ttl.ANY,
+                        Capability.Queryable.ANY,
+                        Capability.Shareable.ANY
+                    )
+                )
+            ) {
+                override fun create(options: StorageKeyOptions): Memory {
+                    return Memory(options.location, options.entitySchema.hash)
+                }
+            }
         }
     }
 
@@ -120,11 +120,6 @@ sealed class DatabaseStorageKey(
         private val ENTITY_SCHEMA_HASH_PATTERN = "[a-fA-F0-9]+".toRegex()
         private val DB_STORAGE_KEY_PATTERN =
             "^($ENTITY_SCHEMA_HASH_PATTERN)@($DATABASE_NAME_PATTERN)/(.+)\$".toRegex()
-
-        fun registerKeyCreator() {
-            CapabilitiesResolver.registerStorageKeyFactory(Persistent.Factory())
-            CapabilitiesResolver.registerStorageKeyFactory(Memory.Factory())
-        }
 
         private inline fun <reified T : DatabaseStorageKey> fromString(rawKeyString: String): T {
             val match = requireNotNull(DB_STORAGE_KEY_PATTERN.matchEntire(rawKeyString)) {

@@ -34,20 +34,6 @@ data class VolatileStorageKey(
 
     override fun toString(): String = super.toString()
 
-    class VolatileStorageKeyFactory : StorageKeyFactory(
-        protocol,
-        Capabilities(
-            listOf(
-                Capability.Persistence.IN_MEMORY,
-                Capability.Shareable(false)
-            )
-        )
-    ) {
-        override fun create(options: StorageKeyOptions): StorageKey {
-            return VolatileStorageKey(options.arcId, options.unique)
-        }
-    }
-
     companion object : StorageKeySpec<VolatileStorageKey> {
         private val VOLATILE_STORAGE_KEY_PATTERN = "^([^/]+)/(.*)\$".toRegex()
         override val protocol = Protocols.VOLATILE_DRIVER
@@ -61,8 +47,18 @@ data class VolatileStorageKey(
             return VolatileStorageKey(match.groupValues[1].toArcId(), match.groupValues[2])
         }
 
-        fun registerKeyCreator() {
-            CapabilitiesResolver.registerStorageKeyFactory(VolatileStorageKeyFactory())
+        val factory = object : StorageKeyFactory<VolatileStorageKey>(
+            protocol,
+            Capabilities(
+                listOf(
+                    Capability.Persistence.IN_MEMORY,
+                    Capability.Shareable(false)
+                )
+            )
+        ) {
+            override fun create(options: StorageKeyOptions): VolatileStorageKey {
+                return VolatileStorageKey(options.arcId, options.unique)
+            }
         }
     }
 }

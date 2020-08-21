@@ -27,20 +27,6 @@ data class RamDiskStorageKey(private val unique: String) : StorageKey(protocol) 
 
     override fun toString(): String = super.toString()
 
-    class RamDiskStorageKeyFactory : StorageKeyFactory(
-        protocol,
-        Capabilities(
-            listOf(
-                Capability.Persistence.IN_MEMORY,
-                Capability.Shareable.ANY
-            )
-        )
-    ) {
-        override fun create(options: StorageKeyOptions): StorageKey {
-            return RamDiskStorageKey(options.location)
-        }
-    }
-
     companion object : StorageKeySpec<RamDiskStorageKey> {
         private val RAMDISK_STORAGE_KEY_PATTERN = "^(.*)\$".toRegex()
 
@@ -56,8 +42,18 @@ data class RamDiskStorageKey(private val unique: String) : StorageKey(protocol) 
             return RamDiskStorageKey(match.groupValues[1])
         }
 
-        fun registerKeyCreator() {
-            CapabilitiesResolver.registerStorageKeyFactory(RamDiskStorageKeyFactory())
+        val factory = object : StorageKeyFactory<RamDiskStorageKey>(
+            protocol,
+            Capabilities(
+                listOf(
+                    Capability.Persistence.IN_MEMORY,
+                    Capability.Shareable.ANY
+                )
+            )
+        ) {
+            override fun create(options: StorageKeyOptions): RamDiskStorageKey {
+                return RamDiskStorageKey(options.location)
+            }
         }
     }
 }

@@ -8,7 +8,6 @@
  * grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-
 package arcs.core.storage
 
 /** Locator for a specific piece of data within the storage layer. */
@@ -33,9 +32,3 @@ abstract class StorageKey(val protocol: String) {
 
     override fun hashCode() = toString().hashCode()
 }
-
-/**
- * This describes the metadata related to a [StorageKey] type. The [companion] object of a
- * [StorageKey] implementation should implement this interface.
- */
-interface StorageKeySpec<T : StorageKey> : StorageKeyParser<T>

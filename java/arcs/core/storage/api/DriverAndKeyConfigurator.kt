@@ -69,9 +69,11 @@ object DriverAndKeyConfigurator {
             JoinStorageKey
         )
 
-        CapabilitiesResolver.reset()
-        VolatileStorageKey.registerKeyCreator()
-        RamDiskStorageKey.registerKeyCreator()
-        DatabaseStorageKey.registerKeyCreator()
+        CapabilitiesResolver.reset(
+            VolatileStorageKey.factory,
+            RamDiskStorageKey.factory,
+            DatabaseStorageKey.Memory.factory,
+            DatabaseStorageKey.Persistent.factory
+        )
     }
 }
