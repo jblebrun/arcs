@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.os.Parcelable
 import android.os.ResultReceiver
 import androidx.annotation.VisibleForTesting
+import arcs.android.common.resurrection.ResurrectionRequest
 import arcs.android.host.parcelables.ActualParcelable
 import arcs.android.host.parcelables.ParcelableParticleIdentifier
 import arcs.android.host.parcelables.ParcelablePlanPartition
@@ -27,17 +28,18 @@ import arcs.android.host.parcelables.toParcelable
 import arcs.core.common.ArcId
 import arcs.core.common.toArcId
 import arcs.core.data.Plan
+import arcs.core.host.AbstractArcHost
 import arcs.core.host.ArcHost
 import arcs.core.host.ArcHostException
 import arcs.core.host.ArcState
 import arcs.core.host.ArcStateChangeRegistration
 import arcs.core.host.ParticleIdentifier
+import arcs.core.storage.StorageKeyParser
+import arcs.sdk.android.storage.AndroidStorageServiceResurrectionManager
 import kotlin.reflect.KClass
 import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 /**
  * Tool which can be used by [ArcHost]s to handle [Intent] based API calls, as well as
@@ -67,6 +69,7 @@ import kotlinx.coroutines.launch
  */
 class ArcHostHelper(
     private val service: Service,
+    private val resurrectionHelper: AndroidStorageServiceResurrectionManager?,
     vararg arcHosts: ArcHost
 ) {
     private val job = SupervisorJob() + Dispatchers.Unconfined + CoroutineName("ArcHostHelper")
@@ -82,20 +85,28 @@ class ArcHostHelper(
     private suspend fun availableHosts() = arcHostByHostId.keys
 
     /**
-     * Determines whether or not the given [Intent] represents a call to an [ArcHost] and invokes
-     * the appropriate interface methods.
+     * Determines whether or not the given [intent] represents a resurrection, and if it does:
+     * calls [onResurrected].
      */
-    fun onStartCommand(intent: Intent?) = CoroutineScope(job).launch {
-        onStartCommandSuspendable(intent)
+    suspend fun handleResurrectionIntent(intent: Intent?) {
+        if (intent?.action?.startsWith(ResurrectionRequest.ACTION_RESURRECT) != true) return
+
+        val targetId =
+            intent.getStringExtra(ResurrectionRequest.EXTRA_REGISTRATION_TARGET_ID) ?: return
+        val notifiers = intent.getStringArrayListExtra(
+            ResurrectionRequest.EXTRA_RESURRECT_NOTIFIER
+        ) ?: return
+
+        arcHostByHostId.values.forEach {
+            if(it is AbstractArcHost) {
+                it.resurrectArc(targetId, notifiers.map(StorageKeyParser.Companion::parse))
+            }
+        }
     }
 
     @VisibleForTesting
     suspend fun onStartCommandSuspendable(intent: Intent?) {
-        arcHostByHostId.values.forEach {
-            if (it is ResurrectableHost) {
-                it.resurrectionHelper.onStartCommand(intent)
-            }
-        }
+        handleResurrectionIntent(intent)
 
         // Ignore other actions
         val action = intent?.action ?: return

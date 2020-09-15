@@ -15,8 +15,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import arcs.android.common.resurrection.ResurrectionRequest
+import arcs.core.host.ResurrectionManager
 import arcs.core.storage.StorageKey
-import arcs.core.storage.StorageKeyParser
 import arcs.sdk.android.storage.service.StorageService
 
 /**
@@ -26,7 +26,7 @@ import arcs.sdk.android.storage.service.StorageService
  *
  * The [Context] used to register for resurrection and the [ResurrectionRequest] received by the
  * storage service have a one-to-one relationship. This means that there should be only one
- * [ResurrectionHelper] used per service.
+ * [AndroidStorageServiceResurrectionManager] used per service.
  *
  * ## Example Usage:
  *
@@ -54,26 +54,10 @@ import arcs.sdk.android.storage.service.StorageService
  * }
  * ```
  */
-class ResurrectionHelper(
+class AndroidStorageServiceResurrectionManager(
     private val context: Context,
-    private val onResurrected: (targetId: String, List<StorageKey>) -> Unit
-) {
-    /**
-     * Determines whether or not the given [intent] represents a resurrection, and if it does:
-     * calls [onResurrected].
-     */
-    fun onStartCommand(intent: Intent?) {
-        if (intent?.action?.startsWith(ResurrectionRequest.ACTION_RESURRECT) != true) return
-
-        val targetId =
-            intent.getStringExtra(ResurrectionRequest.EXTRA_REGISTRATION_TARGET_ID) ?: return
-        val notifiers = intent.getStringArrayListExtra(
-            ResurrectionRequest.EXTRA_RESURRECT_NOTIFIER
-        ) ?: return
-
-        onResurrected(targetId, notifiers.map(StorageKeyParser.Companion::parse))
-    }
-
+    private val storageServiceClass: Class<out Service> = StorageService::class.java,
+) : ResurrectionManager {
     /**
      * Issue a request to be resurrected by the [StorageService] whenever the data identified by
      * the provided [keys] changes.
@@ -82,12 +66,11 @@ class ResurrectionHelper(
      * In other words, [keys] should be an exhaustive list of the [StorageKey]s the caller is
      * interested in.
      */
-    fun requestResurrection(
+    override fun requestResurrection(
         targetId: String,
-        keys: List<StorageKey>,
-        serviceClass: Class<out Service> = StorageService::class.java
+        keys: List<StorageKey>
     ) {
-        val intent = Intent(context, serviceClass)
+        val intent = Intent(context, storageServiceClass)
         val request = ResurrectionRequest.createDefault(context, keys, targetId)
         request.populateRequestIntent(intent)
         context.startService(intent)
@@ -96,11 +79,10 @@ class ResurrectionHelper(
     /**
      * Issue a request to cancel any outstanding request for resurrection from the [StorageService].
      */
-    fun cancelResurrectionRequest(
-        targetId: String,
-        serviceClass: Class<out Service> = StorageService::class.java
+    override fun cancelResurrectionRequest(
+        targetId: String
     ) {
-        val intent = Intent(context, serviceClass)
+        val intent = Intent(context, storageServiceClass)
         val request = ResurrectionRequest.createDefault(context, emptyList(), targetId)
         request.populateUnrequestIntent(intent)
         context.startService(intent)

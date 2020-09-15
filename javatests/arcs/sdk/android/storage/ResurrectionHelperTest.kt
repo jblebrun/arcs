@@ -36,7 +36,7 @@ import org.robolectric.Shadows.shadowOf
 class ResurrectionHelperTest {
     private var callbackCalls = mutableListOf<List<StorageKey>>()
     private lateinit var context: Context
-    private lateinit var helper: ResurrectionHelper
+    private lateinit var helper: AndroidStorageServiceResurrectionManager
     private lateinit var service: ResurrectionHelperDummyService
 
     @Before
@@ -47,7 +47,7 @@ class ResurrectionHelperTest {
 
         callbackCalls.clear()
 
-        helper = ResurrectionHelper(context) { _, keys -> callbackCalls.add(keys) }
+        helper = AndroidStorageServiceResurrectionManager(context, ResurrectionHelperDummyService::class.java) { _, keys -> callbackCalls.add(keys) }
     }
 
     @Test
@@ -100,7 +100,7 @@ class ResurrectionHelperTest {
             RamDiskStorageKey("foo"),
             RamDiskStorageKey("bar")
         )
-        helper.requestResurrection("test", storageKeys, ResurrectionHelperDummyService::class.java)
+        helper.requestResurrection("test", storageKeys)
 
         val actualIntent = shadowOf(ApplicationProvider.getApplicationContext<Application>())
             .nextStartedService
@@ -123,7 +123,7 @@ class ResurrectionHelperTest {
 
     @Test
     fun cancelResurrectionRequest() {
-        helper.cancelResurrectionRequest("test", ResurrectionHelperDummyService::class.java)
+        helper.cancelResurrectionRequest("test")
 
         val actualIntent = shadowOf(ApplicationProvider.getApplicationContext<Application>())
             .nextStartedService

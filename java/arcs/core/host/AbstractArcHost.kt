@@ -35,7 +35,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -101,8 +100,7 @@ abstract class AbstractArcHost(
     // There can be more then one instance of a host, hashCode is used to disambiguate them
     override val hostId = "${this::class.className()}@${this.hashCode()}"
 
-    // TODO: add lifecycle API for ArcHosts shutting down to cancel running coroutines
-    private val resurrectionScope = CoroutineScope(coroutineContext)
+    var resurrectionManager: ResurrectionManager? = null
 
     /**
      * Supports asynchronous [ArcHostContext] serializations in observed order.
@@ -210,7 +208,6 @@ abstract class AbstractArcHost(
         clearContextCache()
         pausedArcs.clear()
         contextSerializationChannel.cancel()
-        resurrectionScope.cancel()
         stores.reset()
         schedulerProvider.cancelAll()
     }
@@ -415,7 +412,7 @@ abstract class AbstractArcHost(
                 context.arcState = ArcState.Running
 
                 // If the platform supports resurrection, request it for this Arc's StorageKeys
-                maybeRequestResurrection(context)
+                resurrectionManager?.requestResurrection(context.arcId, context.allReadableStorageKeys())
             } catch (e: Exception) {
                 context.arcState = ArcState.errorWith(e)
                 // TODO(b/160251910): Make logging detail more cleanly conditional.
@@ -498,30 +495,15 @@ abstract class AbstractArcHost(
         }
     }
 
-    /**
-     * Lookup [StorageKey]s used in the current [ArcHostContext] and potentially register them
-     * with a [ResurrectorService], so that this [ArcHost] is instructed to automatically
-     * restart in the event of a crash.
-     */
-    protected open fun maybeRequestResurrection(context: ArcHostContext) = Unit
-
-    /**
-     * Inform [ResurrectorService] to cancel requests for resurrection for the [StorageKey]s in
-     * this [ArcHostContext].
-     */
-    protected open fun maybeCancelResurrection(context: ArcHostContext) = Unit
-
     /** Helper used by implementors of [ResurrectableHost]. */
     @Suppress("UNUSED_PARAMETER")
-    fun onResurrected(arcId: String, affectedKeys: List<StorageKey>) {
-        resurrectionScope.launch {
-            if (isRunning(arcId)) {
-                return@launch
-            }
-            val context = lookupOrCreateArcHostContext(arcId)
-            val partition = contextToPartition(arcId, context)
-            startArc(partition)
+    suspend fun resurrectArc(arcId: String, affectedKeys: List<StorageKey>) {
+        if (isRunning(arcId)) {
+            return
         }
+        val context = lookupOrCreateArcHostContext(arcId)
+        val partition = contextToPartition(arcId, context)
+        startArc(partition)
     }
 
     private fun contextToPartition(arcId: String, context: ArcHostContext) =
@@ -593,7 +575,7 @@ abstract class AbstractArcHost(
     private suspend fun stopArcInternal(arcId: String, context: ArcHostContext) {
         try {
             context.particles.forEach { it.stopParticle() }
-            maybeCancelResurrection(context)
+            resurrectionManager?.cancelResurrectionRequest(context.arcId)
             context.arcState = ArcState.Stopped
             updateArcHostContext(arcId, context)
         } finally {

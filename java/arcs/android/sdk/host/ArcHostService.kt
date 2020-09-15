@@ -12,32 +12,54 @@ package arcs.android.sdk.host
 
 import android.content.Intent
 import androidx.lifecycle.LifecycleService
+import arcs.core.host.AbstractArcHost
 import arcs.core.host.ArcHost
+import arcs.sdk.android.storage.AndroidStorageServiceResurrectionManager
+import arcs.sdk.android.storage.service.StorageService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Base [Service] for embedders of [ArcHost].
  */
+@ExperimentalCoroutinesApi
 abstract class ArcHostService : LifecycleService() {
     protected val scope: CoroutineScope = MainScope()
 
-    // TODO: remove after G3 fixed
     abstract val arcHost: ArcHost
+
+    open val storageServiceClass: Class<out StorageService> = StorageService::class.java
+
+    private val resurrectionManager by lazy {
+        AndroidStorageServiceResurrectionManager(
+            applicationContext,
+            storageServiceClass
+        )
+    }
 
     /**
      * Subclasses must override this with their own [ArcHost]s.
      */
-    open val arcHosts: List<ArcHost> by lazy { listOf(arcHost) }
+    open val arcHosts: List<ArcHost> by lazy {
+        listOf(arcHost).onEach {
+            if (it is AbstractArcHost) {
+                it.resurrectionManager = resurrectionManager
+            }
+        }
+    }
 
-    val arcHostHelper: ArcHostHelper by lazy {
-        ArcHostHelper(this, *arcHosts.toTypedArray())
+    private val arcHostHelper: ArcHostHelper by lazy {
+        ArcHostHelper(this, resurrectionManager, *arcHosts.toTypedArray())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
-        arcHostHelper.onStartCommand(intent)
+        scope.launch {
+            arcHostHelper.onStartCommandSuspendable(intent)
+        }
         return result
     }
 

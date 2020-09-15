@@ -33,7 +33,7 @@ import arcs.core.storage.StorageKey
 import arcs.core.storage.StorageKeyParser
 import arcs.core.storage.StoreOptions
 import arcs.core.storage.keys.RamDiskStorageKey
-import arcs.sdk.android.storage.ResurrectionHelper
+import arcs.sdk.android.storage.AndroidStorageServiceResurrectionManager
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -72,7 +72,7 @@ class StorageServiceTest {
         // ShadowApplication-captured nextStartedService intents.
         val receivedUpdates = mutableListOf<List<StorageKey>>()
         val receivedIds = mutableListOf<String>()
-        val resurrectionHelper = ResurrectionHelper(app) { id: String, keys: List<StorageKey> ->
+        val resurrectionHelper = AndroidStorageServiceResurrectionManager(app) { id: String, keys: List<StorageKey> ->
             receivedUpdates.add(keys)
             receivedIds.add(id)
         }
