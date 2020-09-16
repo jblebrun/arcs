@@ -15,29 +15,22 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import arcs.core.storage.driver.DatabaseDriverProvider
 import arcs.core.util.TaggedLog
-import kotlinx.coroutines.runBlocking
+import arcs.android.util.CoroutineTask
 
 /**
  * Implementation of a [Worker] which performs periodic scan of storage and deletes expired data.
+ *
+ * In order to use this class, you must override it and provide the [jobClass] [CoroutineScope]
+ * property to indicate where the job should be run.
  */
-class PeriodicCleanupTask(
+abstract class PeriodicCleanupTask(
     appContext: Context,
     workerParams: WorkerParameters
-) : Worker(appContext, workerParams) {
-
+) : CoroutineTask(appContext, workerParams) {
     private val log = TaggedLog { WORKER_TAG }
     init { log.debug { "Created." } }
 
-    // Note on `runBlocking` usage:
-    // `doWork` is run synchronously by the work manager.
-    // This is one of the rare cases that runBlocking was intended for: implementing the
-    // functionality of a synchronous API but requiring the use of suspending methods.
-    //
-    // Returning from `doWork` is a signal of completion, so we must block here.
-    //
-    // To avoid blocking thread issues, ensure that the work manager will not schedule this
-    // work on any important threads that you're using elsewhere.
-    override fun doWork(): Result = runBlocking {
+    final override suspend fun doWork(): Result {
         log.debug { "Running." }
         // Use the DatabaseDriverProvider instance of the databaseManager to make sure changes by
         // TTL expiry are propagated to listening Stores.
@@ -45,7 +38,7 @@ class PeriodicCleanupTask(
         databaseManager.removeExpiredEntities()
         log.debug { "Success." }
         // Indicate whether the task finished successfully with the Result
-        Result.success()
+        return Result.success()
     }
 
     companion object {
