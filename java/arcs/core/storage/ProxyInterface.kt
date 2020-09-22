@@ -112,7 +112,7 @@ interface StorageEndpoint<Data : CrdtData, Op : CrdtOperation, ConsumerData> {
     suspend fun idle()
 
     /**
-     * Sends the storage layer a message from a [StorageProxy].
+     * Sends the storage layer a message from a [IStorageProxy].
      */
     suspend fun onProxyMessage(message: ProxyMessage<Data, Op, ConsumerData>)
 

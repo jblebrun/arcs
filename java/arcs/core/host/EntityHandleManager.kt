@@ -49,6 +49,7 @@ import arcs.core.entity.WriteQueryCollectionHandle
 import arcs.core.entity.WriteSingletonHandle
 import arcs.core.storage.StorageEndpointManager
 import arcs.core.storage.StorageKey
+import arcs.core.storage.IStorageProxy
 import arcs.core.storage.StorageProxy
 import arcs.core.storage.StoreOptions
 import arcs.core.storage.referencemode.ReferenceModeStorageKey
@@ -68,7 +69,7 @@ import kotlinx.coroutines.sync.withLock
  * The [scheduler] provided to the [EntityHandleManager] at construction-time will be shared across
  * all handles and storage-proxies created by the [EntityHandleManager].
  *
- * Call [close] on an instance that will no longer be used to ensure that all [StorageProxy]
+ * Call [close] on an instance that will no longer be used to ensure that all [IStorageProxy]
  * instances created by this [EntityHandleManager] will also be closed.
  */
 class EntityHandleManager(
@@ -170,7 +171,7 @@ class EntityHandleManager(
         HandleContainerType.Collection -> createCollectionHandle(config)
     }
 
-    /** Close all [StorageProxy] instances in this [EntityHandleManager]. */
+    /** Close all [IStorageProxy] instances in this [EntityHandleManager]. */
     override suspend fun close() {
         proxyMutex.withLock {
             // Needed to avoid receiving ModelUpdate after Proxy closed error
@@ -259,7 +260,7 @@ class EntityHandleManager(
         schema: Schema
     ): SingletonProxy<R> = proxyMutex.withLock {
         singletonStorageProxies.getOrPut(storageKey) {
-            StorageProxy.create(
+            StorageProxyImpl.create(
                 storeOptions = StoreOptions(
                     storageKey = storageKey,
                     type = SingletonType(EntityType(schema))

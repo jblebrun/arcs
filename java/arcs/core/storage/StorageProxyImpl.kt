@@ -12,6 +12,8 @@
 package arcs.core.storage
 
 import arcs.core.analytics.Analytics
+import arcs.core.storage.IStorageProxy.CallbackIdentifier
+import arcs.core.storage.IStorageProxy.StorageEvent
 import arcs.core.crdt.CrdtData
 import arcs.core.crdt.CrdtModel
 import arcs.core.crdt.CrdtOperationAtTime
@@ -42,33 +44,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * [StorageProxy] is an intermediary between a [Handle] and [Store]. It provides up-to-date CRDT
- * state to readers, and ensures write operations apply cleanly before forwarding to the store.
- *
- * @param T the consumer data type for the model behind this proxy
- * @param initialCrdt the CrdtModel instance [StorageProxy] will apply ops to.
- */
+
+/** Standard implementation of [IStorageProxy]. */
 @Suppress("EXPERIMENTAL_API_USAGE")
 open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private constructor(
-    val storageKey: StorageKey,
+    override val storageKey: StorageKey,
     crdt: CrdtModel<Data, Op, T>,
     private val scheduler: Scheduler,
     private val time: Time,
     private val analytics: Analytics? = null
-) {
+) : IStorageProxy<Data, Op, T> {
     // Nullable internally, we don't allow constructor to pass null model
     private var _crdt: CrdtModel<Data, Op, T>? = crdt
 
     private val crdt: CrdtModel<Data, Op, T>
         get() = _crdt ?: throw IllegalStateException("StorageProxy closed")
 
-    /**
-     * If you need to interact with the data managed by this [StorageProxy], and you're not a
-     * [Store], you must either be performing your interactions within a handle callback or on this
-     * [CoroutineDispatcher].
-     */
-    val dispatcher: CoroutineDispatcher
+    override val dispatcher: CoroutineDispatcher
         get() = scheduler.asCoroutineDispatcher()
 
     private val log = TaggedLog { "StorageProxy" }
@@ -148,15 +140,7 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
     /* visible for testing */
     fun getStateForTesting(): ProxyState = stateHolder.value.state
 
-    /**
-     * If the [StorageProxy] is associated with any readable handles, it will need to operate
-     * in synchronized mode. This is done via a two-step process:
-     *   1) When constructed, all readable handles call this method to move the proxy from its
-     *      initial state of [NO_SYNC] to [READY_TO_SYNC].
-     *   2) [ParticleContext] then triggers the actual sync request after the arc has been
-     *      set up and all particles have received their onStart events.
-     */
-    open fun prepareForSync() {
+    override fun prepareForSync() {
         checkNotClosed()
         stateHolder.update {
             if (it.state == ProxyState.NO_SYNC) {
@@ -167,11 +151,7 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         }
     }
 
-    /**
-     * If the [StorageProxy] has previously been set up for synchronized mode, send a sync request
-     * to the backing store and move to [AWAITING_SYNC].
-     */
-    fun maybeInitiateSync() {
+    override fun maybeInitiateSync() {
         checkNotClosed()
         var needsSync = false
         stateHolder.update {
@@ -191,22 +171,12 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         if (needsSync) requestSynchronization()
     }
 
-    /**
-     * [AbstractArcHost] calls this (via [Handle]) to thread storage events back
-     * to the [ParticleContext], which manages the [Particle] lifecycle API.
-     */
-    fun registerForStorageEvents(id: CallbackIdentifier, notify: (StorageEvent) -> Unit) {
+    override fun registerForStorageEvents(id: CallbackIdentifier, notify: (StorageEvent) -> Unit) {
         checkNotClosed()
         handleCallbacks.update { it.addNotify(id, notify) }
     }
 
-    /**
-     * Add a [Handle] `onReady` action associated with a [Handle] name.
-     *
-     * If the [StorageProxy] is synchronized when the action is added, it will be called
-     * on the next iteration of the [Scheduler].
-     */
-    fun addOnReady(id: CallbackIdentifier, action: () -> Unit) {
+    override fun addOnReady(id: CallbackIdentifier, action: () -> Unit) {
         checkNotClosed()
         checkWillSync()
         handleCallbacks.update { it.addOnReady(id, action) }
@@ -215,22 +185,13 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         }
     }
 
-    /**
-     * Add a [Handle] `onUpdate` action associated with a [Handle] name.
-     */
-    fun addOnUpdate(id: CallbackIdentifier, action: (oldValue: T, newValue: T) -> Unit) {
+    override fun addOnUpdate(id: CallbackIdentifier, action: (oldValue: T, newValue: T) -> Unit) {
         checkNotClosed()
         checkWillSync()
         handleCallbacks.update { it.addOnUpdate(id, action) }
     }
 
-    /**
-     * Add a [Handle] `onDesync` action associated with a [Handle] name.
-     *
-     * If the [StorageProxy] is desynchronized when the action is added, it will be called
-     * on the next iteration of the [Scheduler].
-     */
-    fun addOnDesync(id: CallbackIdentifier, action: () -> Unit) {
+    override fun addOnDesync(id: CallbackIdentifier, action: () -> Unit) {
         checkNotClosed()
         checkWillSync()
         handleCallbacks.update { it.addOnDesync(id, action) }
@@ -239,32 +200,22 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         }
     }
 
-    /**
-     * Add a [Handle] `onResync` action associated with a [Handle] name.
-     */
-    fun addOnResync(id: CallbackIdentifier, action: () -> Unit) {
+    override fun addOnResync(id: CallbackIdentifier, action: () -> Unit) {
         checkNotClosed()
         checkWillSync()
         handleCallbacks.update { it.addOnResync(id, action) }
     }
 
-    /**
-     *  Remove all `onUpdate`, `onReady`, `onDesync` and `onResync` callbacks associated with the
-     *  provided `handleName`.
-     *
-     * A [Handle] that is being removed from active usage should make sure to trigger this method
-     * on its associated [StorageProxy].
-     */
-    fun removeCallbacksForName(id: CallbackIdentifier) {
+    override fun removeCallbacksForName(id: CallbackIdentifier) {
         handleCallbacks.update { it.removeCallbacks(id) }
     }
 
     /**
-     * Closes this [StorageProxy]. It will no longer receive messages from its associated [Store].
-     * Attempting to perform an operation on a closed [StorageProxy] will result in an exception
+     * Closes this [StorageProxyImpl]. It will no longer receive messages from its associated [Store].
+     * Attempting to perform an operation on a closed [StorageProxyImpl] will result in an exception
      * being thrown.
      */
-    suspend fun close() {
+    override suspend fun close() {
         if (stateHolder.value.state == ProxyState.CLOSED) return
         waitForIdle()
         scheduler.scope.launch {
@@ -273,19 +224,9 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
             _crdt = null
         }.join()
     }
-    /**
-     * Apply a CRDT operation to the [CrdtModel] that this [StorageProxy] manages, notifies read
-     * handles, and forwards the write to the [Store].
-     */
-    @Suppress("DeferredIsResult")
-    fun applyOp(op: Op): Deferred<Boolean> = applyOps(listOf(op))
 
-    /**
-     * Applies an ordered [List] of CRDT operations to the [CrdtModel] that this [StorageProxy]
-     * manages, notifies read handles, and forwards the writes to the [Store].
-     */
     @Suppress("DeferredIsResult")
-    open fun applyOps(ops: List<Op>): Deferred<Boolean> {
+    override fun applyOps(ops: List<Op>): Deferred<Boolean> {
         checkNotClosed()
         checkInDispatcher()
         log.verbose { "Applying operations: $ops" }
@@ -309,10 +250,7 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         return result
     }
 
-    /**
-     * Return a copy of the current version map.
-     */
-    open fun getVersionMap(): VersionMap = crdt.versionMap.copy()
+    override fun getVersionMap(): VersionMap = crdt.versionMap.copy()
 
     /**
      * Return the current local version of the model. Suspends until it has a synchronized view of
@@ -320,13 +258,8 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
      */
     suspend fun getParticleView(): T = getParticleViewAsync().await()
 
-    /**
-     * Similar to [getParticleView], but requires the current proxy to have been synced at least
-     * once, and also requires the caller to be running within the [Scheduler]'s thread.
-     *
-     * TODO(b/153560976): Enforce the scheduler thread requirement.
-     */
-    fun getParticleViewUnsafe(): T {
+    /** TODO(b/153560976): Enforce the scheduler thread requirement. */
+    override fun getParticleViewUnsafe(): T {
         checkNotClosed()
         checkInDispatcher()
         log.debug { "Getting particle view (lifecycle)" }
@@ -386,7 +319,7 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
 
         if (message is ProxyMessage.SyncRequest) {
             // Storage wants our latest state.
-            val data = withContext(this@StorageProxy.dispatcher) { crdt.data }
+            val data = withContext(this@StorageProxyImpl.dispatcher) { crdt.data }
             sendMessageToStore(ProxyMessage.ModelUpdate(data, null))
             return@coroutineScope
         }
@@ -604,12 +537,6 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         "(i.e. there are no readable handles observing this proxy)"
     }
 
-    /**
-     * Two-dimensional identifier for handle callbacks. Typically this will be the handle's name,
-     * as well as its particle's ID.
-     */
-    data class CallbackIdentifier(val handleName: String, val namespace: String = "")
-
     private class MessageFromStoreTask(block: () -> Unit) : Scheduler.Task.Processor(block)
 
     private class HandleCallbackTask(
@@ -668,17 +595,6 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         fun clearWaitingSyncs() = copy(waitingSyncs = emptyList())
     }
 
-    /**
-     * Event types used for notifying the [ParticleContext] to drive the [Particle]'s
-     * storage events API.
-     */
-    enum class StorageEvent {
-        READY,
-        UPDATE,
-        DESYNC,
-        RESYNC
-    }
-
     // Visible for testing
     enum class ProxyState {
         /**
@@ -700,18 +616,18 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
         AWAITING_SYNC,
 
         /**
-         * The [StorageProxy] is synchronized with its associated storage.
+         * The [StorageProxyImpl] is synchronized with its associated storage.
          */
         SYNC,
 
         /**
          * A set of model operations from storage failed to apply cleanly to the local CRDT model,
-         * so the [StorageProxy] is desynchronized. A request has been sent to resynchronize.
+         * so the [StorageProxyImpl] is desynchronized. A request has been sent to resynchronize.
          */
         DESYNC,
 
         /**
-         * The [StorageProxy] has been closed; no further operations are possible, and no
+         * The [StorageProxyImpl] has been closed; no further operations are possible, and no
          * messages from the store will be received.
          */
         CLOSED,
@@ -725,12 +641,12 @@ open class StorageProxy<Data : CrdtData, Op : CrdtOperationAtTime, T> private co
             scheduler: Scheduler,
             time: Time,
             analytics: Analytics? = null
-        ): StorageProxy<Data, Op, T> {
+        ): StorageProxyImpl<Data, Op, T> {
             /**
              * Since [storageEndpointManager.get] is a suspending method, we need to be in a
              * suspending context in order to attach its callback.
              */
-            return StorageProxy(storeOptions.storageKey, crdt, scheduler, time, analytics).also {
+            return StorageProxyImpl(storeOptions.storageKey, crdt, scheduler, time, analytics).also {
                 it.store = storageEndpointManager.get(storeOptions, ProxyCallback(it::onMessage))
             }
         }

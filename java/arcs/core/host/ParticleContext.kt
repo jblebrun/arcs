@@ -13,8 +13,8 @@ package arcs.core.host
 import arcs.core.data.Plan
 import arcs.core.entity.Handle
 import arcs.core.host.api.Particle
-import arcs.core.storage.StorageProxy
-import arcs.core.storage.StorageProxy.StorageEvent
+import arcs.core.storage.IStorageProxy
+import arcs.core.storage.IStorageProxy.StorageEvent
 import arcs.core.util.Scheduler
 import arcs.core.util.TaggedLog
 import kotlinx.coroutines.withContext
@@ -129,7 +129,7 @@ class ParticleContext(
      * For write-only particles, immediately calls `onReady`, moves [particle] to
      * [ParticleState.Running] and fires the [notifyReady] callback.
      *
-     * For particles with readable handles, triggers their underlying [StorageProxy] sync requests.
+     * For particles with readable handles, triggers their underlying [IStorageProxy] sync requests.
      * As each proxy is synced, [notify] will receive a [StorageEvent.READY] event; once all have
      * been received the particle is made ready as above.
      */
@@ -204,7 +204,7 @@ class ParticleContext(
     }
 
     /**
-     * Called by [StorageProxy] (via the callback in [registerHandle]) when it receives storage
+     * Called by [IStorageProxy] (via the callback in [registerHandle]) when it receives storage
      * events. This is responsible for driving the particle lifecycle API after startup and
      * managing the running particle state.
      *

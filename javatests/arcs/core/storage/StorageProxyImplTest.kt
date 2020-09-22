@@ -17,8 +17,8 @@ import arcs.core.crdt.CrdtModel
 import arcs.core.crdt.CrdtOperation
 import arcs.core.crdt.CrdtOperationAtTime
 import arcs.core.crdt.VersionMap
-import arcs.core.storage.StorageProxy.ProxyState
-import arcs.core.storage.StorageProxy.StorageEvent
+import arcs.core.storage.StorageProxyImpl.ProxyState
+import arcs.core.storage.StorageProxyImpl.StorageEvent
 import arcs.core.storage.keys.Protocols
 import arcs.core.storage.referencemode.ReferenceModeStorageKey
 import arcs.core.type.Type
@@ -59,7 +59,7 @@ import org.mockito.MockitoAnnotations
 
 @ExperimentalCoroutinesApi
 @RunWith(JUnit4::class)
-class StorageProxyTest {
+class StorageProxyImplTest {
     @get:Rule
     val log = LogRule()
 
@@ -82,7 +82,7 @@ class StorageProxyTest {
     private lateinit var mockType: Type
 
     private lateinit var scheduler: Scheduler
-    private val callbackId = StorageProxy.CallbackIdentifier("test")
+    private val callbackId = StorageProxyImpl.CallbackIdentifier("test")
 
     @Before
     fun setup() {
@@ -105,7 +105,7 @@ class StorageProxyTest {
         whenever(mockCrdtModel.consumerView).thenReturn("data")
     }
 
-    private suspend fun mockProxy() = StorageProxy.create(
+    private suspend fun mockProxy() = StorageProxyImpl.create(
         StoreOptions(
             storageKey = mockStorageKey,
             type = mockType
@@ -415,7 +415,7 @@ class StorageProxyTest {
     fun removeCallbacksForName() = runTest {
         val proxy = mockProxy()
         val notifyChannel = Channel<StorageEvent>(Channel.BUFFERED)
-        proxy.registerForStorageEvents(StorageProxy.CallbackIdentifier("dontRemoveMe")) {
+        proxy.registerForStorageEvents(StorageProxyImpl.CallbackIdentifier("dontRemoveMe")) {
             runBlocking { notifyChannel.send(it) }
         }
         proxy.prepareForSync()
@@ -794,7 +794,7 @@ class StorageProxyTest {
                 }
             }
 
-        val proxy = StorageProxy.create(
+        val proxy = StorageProxyImpl.create(
             StoreOptions(
                 storageKey = volatileStorageKey,
                 type = mockType
@@ -855,7 +855,7 @@ class StorageProxyTest {
             ReferenceModeStorageKey(dbBackingStorageKey, dbStorageKey)
 
         val proxy =
-            StorageProxy.create(
+            StorageProxyImpl.create(
                 StoreOptions(
                     storageKey = dbReferenceModeStorageKey,
                     type = mockType
@@ -905,8 +905,8 @@ class StorageProxyTest {
     )
 
     private suspend fun addAllActions(
-        id: StorageProxy.CallbackIdentifier,
-        proxy: StorageProxy<CrdtData, CrdtOperationAtTime, String>
+        id: StorageProxyImpl.CallbackIdentifier,
+        proxy: StorageProxyImpl<CrdtData, CrdtOperationAtTime, String>
     ): ActionMocks {
         val channels = ActionChannels()
         val mocks = ActionMocks(channels = channels).also { mocks ->

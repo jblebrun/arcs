@@ -13,7 +13,7 @@ package arcs.core.entity
 import arcs.core.common.Referencable
 import arcs.core.crdt.CrdtSet
 import arcs.core.data.RawEntity
-import arcs.core.storage.StorageProxy
+import arcs.core.storage.IStorageProxy
 import kotlinx.coroutines.Job
 
 typealias CollectionProxy<T> = StorageProxy<CrdtSet.Data<T>, CrdtSet.IOperation<T>, Set<T>>

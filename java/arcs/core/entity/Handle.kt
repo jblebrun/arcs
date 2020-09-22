@@ -16,8 +16,8 @@ import arcs.core.data.EntityType
 import arcs.core.data.HandleMode
 import arcs.core.data.ReferenceType
 import arcs.core.data.SingletonType
-import arcs.core.storage.StorageProxy
-import arcs.core.storage.StorageProxy.StorageEvent
+import arcs.core.storage.IStorageProxy
+import arcs.core.storage.IStorageProxy.StorageEvent
 import arcs.core.type.Type
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineDispatcher
@@ -48,17 +48,17 @@ interface Handle {
     fun close()
 
     // TODO(b/158785940): move internal methods to an internal interface
-    /** Internal method used to connect [StorageProxy] events to the [ParticleContext]. */
+    /** Internal method used to connect [IStorageProxy] events to the [ParticleContext]. */
     fun registerForStorageEvents(notify: (StorageEvent) -> Unit)
 
     /** Remove any storage callbacks, but still allow write methods. */
     fun unregisterForStorageEvents()
 
-    /** Internal method used to trigger a sync request on this handle's [StorageProxy]. */
+    /** Internal method used to trigger a sync request on this handle's [IStorageProxy]. */
     fun maybeInitiateSync()
 
-    /** Internal method to return this handle's underlying [StorageProxy]. */
-    fun getProxy(): StorageProxy<*, *, *>
+    /** Internal method to return this handle's underlying [IStorageProxy]. */
+    fun getProxy(): IStorageProxy<*, *, *>
 }
 
 /** Suspends until the [Handle] has synced with the store. */

@@ -10,8 +10,8 @@
  */
 package arcs.core.entity
 
-import arcs.core.storage.StorageProxy
-import arcs.core.storage.StorageProxy.StorageEvent
+import arcs.core.storage.IStorageProxy
+import arcs.core.storage.IStorageProxy.StorageEvent
 import arcs.core.storage.referencemode.ReferenceModeStorageKey
 import kotlinx.coroutines.CoroutineDispatcher
 
@@ -28,7 +28,7 @@ abstract class BaseHandle<T : Storable>(config: BaseHandleConfig) : Handle {
 
     protected var closed = false
     protected val callbackIdentifier =
-        StorageProxy.CallbackIdentifier(config.name, config.particleId)
+        IStorageProxy.CallbackIdentifier(config.name, config.particleId)
 
     private val storageProxy = config.storageProxy
     private val dereferencerFactory = config.dereferencerFactory
@@ -91,17 +91,17 @@ abstract class BaseHandle<T : Storable>(config: BaseHandleConfig) : Handle {
         /** Description of the capabilities and other details about the [Handle]. */
         val spec: HandleSpec,
         /**
-         * [StorageProxy] instance to use when listening for updates, fetching data, or issuing
+         * [IStorageProxy] instance to use when listening for updates, fetching data, or issuing
          * changes.
          */
-        val storageProxy: StorageProxy<*, *, *>,
+        val storageProxy: IStorageProxy<*, *, *>,
         /**
          * Creates de-referencers to support hydrating references within entities.
          */
         val dereferencerFactory: EntityDereferencerFactory,
         /**
          * ID of the Owning-particle. Used as a namespace for listeners created by this handle on
-         * the [StorageProxy].
+         * the [IStorageProxy].
          */
         val particleId: String
     )

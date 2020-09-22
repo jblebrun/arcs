@@ -14,7 +14,7 @@ import arcs.core.data.Plan
 import arcs.core.entity.Handle
 import arcs.core.host.api.HandleHolder
 import arcs.core.host.api.Particle
-import arcs.core.storage.StorageProxy.StorageEvent
+import arcs.core.storage.IStorageProxy.StorageEvent
 import arcs.core.testutil.assertSuspendingThrows
 import arcs.core.testutil.runTest
 import arcs.core.util.Scheduler

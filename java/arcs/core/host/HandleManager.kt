@@ -5,7 +5,7 @@ import arcs.core.data.Schema
 import arcs.core.entity.Handle
 import arcs.core.entity.HandleSpec
 import arcs.core.storage.StorageKey
-import arcs.core.storage.StorageProxy
+import arcs.core.storage.IStorageProxy
 import arcs.core.util.Scheduler
 
 /**
@@ -33,5 +33,5 @@ interface HandleManager {
     /** Close all handles created by this handle manager. */
     suspend fun close()
 
-    suspend fun allStorageProxies(): List<StorageProxy<*, *, *>>
+    suspend fun allStorageProxies(): List<IStorageProxy<*, *, *>>
 }
